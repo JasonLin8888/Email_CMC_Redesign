@@ -3,11 +3,12 @@ import { getThread, getThreadMessages } from "@/lib/email/nylasClient";
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const [thread, messages] = await Promise.all([
-    getThread(params.id),
-    getThreadMessages(params.id),
+    getThread(id),
+    getThreadMessages(id),
   ]);
 
   return NextResponse.json({ thread, messages });

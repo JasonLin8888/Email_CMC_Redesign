@@ -3,9 +3,10 @@ import { getMessage, deleteMessage, markRead, archiveMessage } from "@/lib/email
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const message = await getMessage(params.id);
+  const { id } = await params;
+  const message = await getMessage(id);
   if (!message) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -14,21 +15,23 @@ export async function GET(
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  await deleteMessage(params.id);
+  const { id } = await params;
+  await deleteMessage(id);
   return NextResponse.json({ success: true });
 }
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const body = await request.json();
   if (body.action === "markRead") {
-    await markRead(params.id, body.isRead);
+    await markRead(id, body.isRead);
   } else if (body.action === "archive") {
-    await archiveMessage(params.id);
+    await archiveMessage(id);
   }
   return NextResponse.json({ success: true });
 }
