@@ -29,7 +29,7 @@ A Gmail-like email web application built with Next.js 14 (App Router), TypeScrip
 ### 1. Clone & Install
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/JasonLin8888/Email_CMC_Redesign.git
 cd Email_CMC_Redesign
 npm install
 ```

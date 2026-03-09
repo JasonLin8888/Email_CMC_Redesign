@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Minus, Maximize2, Send } from "lucide-react";
+import { X, Minus, Send } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 interface Props {
@@ -60,9 +60,6 @@ export function ComposeModal({ onClose }: Props) {
             className="text-gray-300 hover:text-white"
           >
             <Minus size={16} />
-          </button>
-          <button className="text-gray-300 hover:text-white">
-            <Maximize2 size={16} />
           </button>
           <button onClick={onClose} className="text-gray-300 hover:text-white">
             <X size={16} />

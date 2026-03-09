@@ -121,7 +121,7 @@ export function MailToolbar({
           <input
             type="checkbox"
             checked={allSelected}
-            onChange={() => {}}
+            readOnly
             className="cursor-pointer"
           />
           <span className="text-xs">Select all</span>
