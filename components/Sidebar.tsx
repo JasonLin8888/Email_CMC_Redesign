@@ -20,8 +20,8 @@ interface Props {
 
 const NAV_ITEMS = [
   { folder: "inbox", label: "Inbox", icon: Inbox },
-  { folder: "sent", label: "Sent", icon: Send },
   { folder: "all", label: "All Mail", icon: Archive },
+  { folder: "sent", label: "Sent", icon: Send },
   { folder: "trash", label: "Trash", icon: Trash2 },
 ];
 

@@ -45,10 +45,15 @@ cp .env.example .env.local
 ```env
 NYLAS_API_KEY=your_nylas_api_key_here
 NYLAS_GRANT_ID=your_nylas_grant_id_here
-NYLAS_API_BASE_URL=https://api.nylas.com
+NYLAS_API_BASE_URL=https://api.us.nylas.com
+NYLAS_DEFAULT_FROM_EMAIL=your_email@example.com
+NYLAS_DEFAULT_FROM_NAME=Your Name
 ```
 
-Get these from your [Nylas Dashboard](https://dashboard.nylas.com).
+- `NYLAS_API_KEY` and `NYLAS_GRANT_ID`: Get these from your [Nylas Dashboard](https://dashboard.nylas.com)
+- `NYLAS_API_BASE_URL`: Use `https://api.us.nylas.com` (US region) or `https://api.eu.nylas.com` (EU region)
+- `NYLAS_DEFAULT_FROM_EMAIL`: The email address configured in your Nylas grant (used as sender)
+- `NYLAS_DEFAULT_FROM_NAME`: Display name for outgoing emails (optional)
 
 ### 3. Run Development Server
 

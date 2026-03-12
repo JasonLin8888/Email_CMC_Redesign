@@ -10,12 +10,24 @@ import {
   Thread,
 } from "./types";
 
-const nylas = new Nylas({
-  apiKey: process.env.NYLAS_API_KEY!,
-  apiUri: process.env.NYLAS_API_BASE_URL ?? "https://api.nylas.com",
-});
+function getRequiredEnv(name: "NYLAS_API_KEY" | "NYLAS_GRANT_ID" | "NYLAS_DEFAULT_FROM_EMAIL"): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
 
-const GRANT_ID = process.env.NYLAS_GRANT_ID!;
+const NYLAS_API_KEY = getRequiredEnv("NYLAS_API_KEY");
+const NYLAS_GRANT_ID = getRequiredEnv("NYLAS_GRANT_ID");
+const NYLAS_DEFAULT_FROM_EMAIL = getRequiredEnv("NYLAS_DEFAULT_FROM_EMAIL");
+const NYLAS_API_BASE_URL = process.env.NYLAS_API_BASE_URL ?? "https://api.us.nylas.com";
+const NYLAS_DEFAULT_FROM_NAME = process.env.NYLAS_DEFAULT_FROM_NAME;
+
+const nylas = new Nylas({
+  apiKey: NYLAS_API_KEY,
+  apiUri: NYLAS_API_BASE_URL,
+});
 
 function toEmailAddress(p: { name?: string; email: string }): EmailAddress {
   return { name: p.name, email: p.email };
@@ -77,20 +89,34 @@ export async function listMessages(
     offset,
   };
 
+  // Map UI folder names to Nylas folder names
   if (folder && folder !== "all") {
-    queryParams["in"] = folder;
+    const folderMap: Record<string, string> = {
+      inbox: "INBOX",
+      sent: "SENT",
+      trash: "TRASH",
+    };
+    queryParams["in"] = folderMap[folder.toLowerCase()] || folder;
   }
+  
+  // Use broader search across subject, body, and participants
   if (query) {
-    queryParams["subject"] = query;
+    queryParams["search_query_native"] = query;
   }
 
   try {
     const response = await nylas.messages.list({
-      identifier: GRANT_ID,
+      identifier: NYLAS_GRANT_ID,
       queryParams: queryParams as Parameters<typeof nylas.messages.list>[0]["queryParams"],
     });
 
-    const messages = (response.data ?? []).map(mapMessage);
+    // Sort by date descending (most recent first) on the client side
+    const messages = (response.data ?? [])
+      .map(mapMessage)
+      .sort((a, b) => b.date - a.date);
+    
+    // Don't set a total count since Nylas API doesn't reliably provide it
+    // The UI will handle pagination without knowing the exact total
     return { messages, total: undefined };
   } catch (err) {
     console.error("listMessages error:", err);
@@ -101,7 +127,7 @@ export async function listMessages(
 export async function getMessage(messageId: string): Promise<FullMessage | null> {
   try {
     const response = await nylas.messages.find({
-      identifier: GRANT_ID,
+      identifier: NYLAS_GRANT_ID,
       messageId,
     });
     return mapFullMessage(response.data);
@@ -114,7 +140,7 @@ export async function getMessage(messageId: string): Promise<FullMessage | null>
 export async function getThread(threadId: string): Promise<Thread | null> {
   try {
     const response = await nylas.threads.find({
-      identifier: GRANT_ID,
+      identifier: NYLAS_GRANT_ID,
       threadId,
     });
     return mapThread(response.data);
@@ -127,7 +153,7 @@ export async function getThread(threadId: string): Promise<Thread | null> {
 export async function getThreadMessages(threadId: string): Promise<FullMessage[]> {
   try {
     const response = await nylas.messages.list({
-      identifier: GRANT_ID,
+      identifier: NYLAS_GRANT_ID,
       queryParams: { threadId, limit: 100 } as Parameters<typeof nylas.messages.list>[0]["queryParams"],
     });
     return (response.data ?? []).map(mapFullMessage);
@@ -139,9 +165,10 @@ export async function getThreadMessages(threadId: string): Promise<FullMessage[]
 
 export async function sendMessage(params: SendMessageParams): Promise<void> {
   await nylas.messages.send({
-    identifier: GRANT_ID,
+    identifier: NYLAS_GRANT_ID,
     requestBody: {
       to: params.to,
+      from: [params.from],
       subject: params.subject,
       body: params.body,
       cc: params.cc,
@@ -150,9 +177,16 @@ export async function sendMessage(params: SendMessageParams): Promise<void> {
   });
 }
 
+export function getDefaultFromAddress(): EmailAddress {
+  return {
+    email: NYLAS_DEFAULT_FROM_EMAIL,
+    name: NYLAS_DEFAULT_FROM_NAME,
+  };
+}
+
 export async function deleteMessage(messageId: string): Promise<void> {
   await nylas.messages.destroy({
-    identifier: GRANT_ID,
+    identifier: NYLAS_GRANT_ID,
     messageId,
   });
 }
@@ -160,7 +194,7 @@ export async function deleteMessage(messageId: string): Promise<void> {
 export async function archiveMessage(messageId: string): Promise<void> {
   try {
     await nylas.messages.update({
-      identifier: GRANT_ID,
+      identifier: NYLAS_GRANT_ID,
       messageId,
       requestBody: {
         unread: false,
@@ -177,7 +211,7 @@ export async function markRead(
   isRead: boolean
 ): Promise<void> {
   await nylas.messages.update({
-    identifier: GRANT_ID,
+    identifier: NYLAS_GRANT_ID,
     messageId,
     requestBody: { unread: !isRead },
   });
@@ -186,7 +220,7 @@ export async function markRead(
 export async function listLabels(): Promise<Label[]> {
   try {
     const response = await nylas.folders.list({
-      identifier: GRANT_ID,
+      identifier: NYLAS_GRANT_ID,
     });
     return (response.data ?? []).map((f: { id: string; name: string }) => ({
       id: f.id,
@@ -202,7 +236,7 @@ export async function listLabels(): Promise<Label[]> {
 export async function createLabel(name: string): Promise<Label | null> {
   try {
     const response = await nylas.folders.create({
-      identifier: GRANT_ID,
+      identifier: NYLAS_GRANT_ID,
       requestBody: { name },
     });
     const f = response.data;
@@ -214,5 +248,36 @@ export async function createLabel(name: string): Promise<Label | null> {
   } catch (err) {
     console.error("createLabel error:", err);
     return null;
+  }
+}
+
+export async function updateLabel(labelId: string, name: string): Promise<Label | null> {
+  try {
+    const response = await nylas.folders.update({
+      identifier: NYLAS_GRANT_ID,
+      folderId: labelId,
+      requestBody: { name },
+    });
+    const f = response.data;
+    return {
+      id: f.id,
+      name: f.name,
+      displayName: f.name,
+    };
+  } catch (err) {
+    console.error("updateLabel error:", err);
+    return null;
+  }
+}
+
+export async function deleteLabel(labelId: string): Promise<void> {
+  try {
+    await nylas.folders.destroy({
+      identifier: NYLAS_GRANT_ID,
+      folderId: labelId,
+    });
+  } catch (err) {
+    console.error("deleteLabel error:", err);
+    throw err;
   }
 }

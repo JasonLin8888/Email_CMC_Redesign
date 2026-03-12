@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Toaster } from "react-hot-toast";
 import { Sidebar } from "./Sidebar";
 import { ComposeModal } from "./ComposeModal";
-import { useRouter } from "next/navigation";
 
 interface Props {
   folder: string;
@@ -23,6 +24,7 @@ export function MailLayout({ folder, showCompose, children }: Props) {
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">
+      <Toaster position="top-right" />
       <Sidebar
         open={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}

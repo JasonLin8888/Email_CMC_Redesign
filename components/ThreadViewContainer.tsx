@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { FullMessage, Thread } from "@/lib/email/types";
 import { ThreadView } from "./ThreadView";
-import { Toaster } from "react-hot-toast";
 
 interface Props {
   threadId: string;
@@ -24,6 +23,16 @@ export function ThreadViewContainer({ threadId, folder }: Props) {
       .then((data) => {
         setThread(data.thread);
         setMessages(data.messages ?? []);
+        
+        // Mark all unread messages as read
+        const unreadMessages = (data.messages ?? []).filter((msg: FullMessage) => msg.unread);
+        unreadMessages.forEach((msg: FullMessage) => {
+          fetch(`/api/messages/${msg.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "markRead", isRead: true }),
+          }).catch(console.error);
+        });
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -31,7 +40,6 @@ export function ThreadViewContainer({ threadId, folder }: Props) {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <Toaster position="top-right" />
       <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-3">
         <button
           onClick={() => router.push(`/mail/${folder}`)}

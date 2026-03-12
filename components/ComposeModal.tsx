@@ -30,11 +30,14 @@ export function ComposeModal({ onClose }: Props) {
     }
     setSending(true);
     try {
+      const toAddresses = to.split(",").map((email) => ({
+        email: email.trim(),
+      }));
       const res = await fetch("/api/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          to: [{ email: to }],
+          to: toAddresses,
           subject,
           body,
         }),
