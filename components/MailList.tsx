@@ -7,20 +7,24 @@ interface Props {
   messages: MessageSummary[];
   folder: string;
   selectedIds: Set<string>;
+  onDragStart: (id: string) => void;
   onSelect: (id: string, selected: boolean) => void;
   onDelete: (id: string) => void;
   onArchive: (id: string) => void;
   onMarkRead: (id: string, isRead: boolean) => void;
+  onAddToCalendar: (id: string) => void;
 }
 
 export function MailList({
   messages,
   folder,
   selectedIds,
+  onDragStart,
   onSelect,
   onDelete,
   onArchive,
   onMarkRead,
+  onAddToCalendar,
 }: Props) {
   if (messages.length === 0) {
     return (
@@ -38,10 +42,12 @@ export function MailList({
           message={msg}
           folder={folder}
           selected={selectedIds.has(msg.id)}
+          onDragStart={onDragStart}
           onSelect={onSelect}
           onDelete={onDelete}
           onArchive={onArchive}
           onMarkRead={onMarkRead}
+          onAddToCalendar={onAddToCalendar}
         />
       ))}
     </div>
