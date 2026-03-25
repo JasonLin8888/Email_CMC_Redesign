@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendMessage } from "@/lib/email/nylasClient";
+import { sendMessage, getDefaultFromAddress } from "@/lib/email/nylasClient";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     await sendMessage({
       to: body.to,
+      from: body.from || getDefaultFromAddress(),
       subject: body.subject,
       body: body.body,
       cc: body.cc,

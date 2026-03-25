@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Toaster, toast } from "react-hot-toast";
+import { toast } from "react-hot-toast";
 import { MessageSummary } from "@/lib/email/types";
 import { SearchBar } from "./SearchBar";
 import { MailToolbar } from "./MailToolbar";
@@ -15,6 +15,66 @@ interface Props {
 }
 
 const LIMIT = 50;
+const CATEGORY_STORAGE_KEY = "mail-category-overrides-v1";
+
+type Tab = "all" | "urgent" | "needs-response" | "todo";
+type Category = Exclude<Tab, "all">;
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "all", label: "All Mail" },
+  { id: "urgent", label: "Urgent" },
+  { id: "needs-response", label: "Needs Response" },
+  { id: "todo", label: "To-do List" },
+];
+
+const URGENT_KEYWORDS = ["urgent", "asap", "immediate", "action required", "deadline", "critical", "important", "time sensitive"];
+const NEEDS_RESPONSE_KEYWORDS = ["please respond", "reply", "let me know", "can you", "could you", "please confirm", "awaiting your", "waiting for your", "please advise", "get back to me", "please reply"];
+const TODO_KEYWORDS = ["todo", "to do", "to-do", "task", "action item", "follow up", "follow-up", "reminder", "due", "by eod", "by cob", "please complete", "please review", "please send"];
+
+function matchesKeywords(msg: MessageSummary, keywords: string[]): boolean {
+  const text = `${msg.subject} ${msg.snippet}`.toLowerCase();
+  return keywords.some((kw) => text.includes(kw));
+}
+
+function inferCategoryFromKeywords(message: MessageSummary): Category | null {
+  if (matchesKeywords(message, URGENT_KEYWORDS)) return "urgent";
+  if (matchesKeywords(message, NEEDS_RESPONSE_KEYWORDS)) return "needs-response";
+  if (matchesKeywords(message, TODO_KEYWORDS)) return "todo";
+  return null;
+}
+
+function getResolvedCategory(
+  message: MessageSummary,
+  categoryOverrides: Record<string, Category>
+): Category | null {
+  return categoryOverrides[message.id] ?? inferCategoryFromKeywords(message);
+}
+
+function filterByTab(
+  messages: MessageSummary[],
+  tab: Tab,
+  categoryOverrides: Record<string, Category>
+): MessageSummary[] {
+  if (tab === "all") return messages;
+  return messages.filter((m) => getResolvedCategory(m, categoryOverrides) === tab);
+}
+
+function loadCategoryOverrides(): Record<string, Category> {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.localStorage.getItem(CATEGORY_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, value]) =>
+        ["urgent", "needs-response", "todo"].includes(value)
+      )
+    ) as Record<string, Category>;
+  } catch {
+    return {};
+  }
+}
 
 export function MailListContainer({ folder, page, query }: Props) {
   const [messages, setMessages] = useState<MessageSummary[]>([]);
@@ -22,6 +82,22 @@ export function MailListContainer({ folder, page, query }: Props) {
   const [total, setTotal] = useState<number | undefined>(undefined);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("all");
+  const [draggedMessageId, setDraggedMessageId] = useState<string | null>(null);
+  const [dragOverTab, setDragOverTab] = useState<Tab | null>(null);
+  const [categoryOverrides, setCategoryOverrides] =
+    useState<Record<string, Category>>({});
+
+  useEffect(() => {
+    setCategoryOverrides(loadCategoryOverrides());
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      CATEGORY_STORAGE_KEY,
+      JSON.stringify(categoryOverrides)
+    );
+  }, [categoryOverrides]);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
@@ -104,6 +180,11 @@ export function MailListContainer({ folder, page, query }: Props) {
     }
   };
 
+  const handleAddToCalendar = (id: string) => {
+    toast("Google Calendar integration coming soon");
+    console.info("Add to Calendar clicked for message:", id);
+  };
+
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedIds);
     setMessages((prev) => prev.filter((m) => !ids.includes(m.id)));
@@ -162,17 +243,70 @@ export function MailListContainer({ folder, page, query }: Props) {
     }
   };
 
-  const displayedMessages = showUnreadOnly
-    ? messages.filter((m) => m.unread)
-    : messages;
+  const updateMessageCategory = (messageId: string, tab: Tab) => {
+    setCategoryOverrides((prev) => {
+      if (tab === "all") {
+        if (!prev[messageId]) return prev;
+        const next = { ...prev };
+        delete next[messageId];
+        return next;
+      }
+      return { ...prev, [messageId]: tab };
+    });
+
+    if (tab === "all") {
+      toast.success("Removed manual category");
+    } else {
+      const display = tab === "todo" ? "To-do" : tab === "urgent" ? "Urgent" : "Needs Response";
+      toast.success(`Moved to ${display}`);
+    }
+  };
+
+  const handleTabDrop = (tab: Tab) => (e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    const droppedId = e.dataTransfer.getData("text/plain") || draggedMessageId;
+    setDragOverTab(null);
+    setDraggedMessageId(null);
+    if (!droppedId) return;
+    updateMessageCategory(droppedId, tab);
+  };
+
+  const displayedMessages = filterByTab(
+    showUnreadOnly ? messages.filter((m) => m.unread) : messages,
+    activeTab,
+    categoryOverrides
+  );
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <Toaster position="top-right" />
 
       {/* Search bar */}
       <div className="flex justify-center px-4 py-3 border-b border-gray-100">
         <SearchBar folder={folder} initialQuery={query} />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200 px-4">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              setDragOverTab(tab.id);
+            }}
+            onDragLeave={() => setDragOverTab((prev) => (prev === tab.id ? null : prev))}
+            onDrop={handleTabDrop(tab.id)}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              activeTab === tab.id
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300"
+            } ${dragOverTab === tab.id ? "bg-blue-50" : ""}`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Toolbar */}
@@ -201,10 +335,12 @@ export function MailListContainer({ folder, page, query }: Props) {
           messages={displayedMessages}
           folder={folder}
           selectedIds={selectedIds}
+          onDragStart={setDraggedMessageId}
           onSelect={handleSelect}
           onDelete={handleDelete}
           onArchive={handleArchive}
           onMarkRead={handleMarkRead}
+          onAddToCalendar={handleAddToCalendar}
         />
       )}
     </div>

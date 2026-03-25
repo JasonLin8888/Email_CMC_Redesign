@@ -47,10 +47,10 @@ export function MailToolbar({
   const folderLabel = FOLDER_LABELS[folder] ?? folder;
   const start = (page - 1) * limit + 1;
   const end = (page - 1) * limit + totalCount;
-  const totalStr = total ? `of ${total.toLocaleString()}` : "of ?";
 
   const isFirstPage = page <= 1;
-  const isLastPage = total ? end >= total : totalCount < limit;
+  // If we got a full page of results, assume there might be more
+  const isLastPage = totalCount < limit;
 
   const goPage = (p: number) => {
     const params = new URLSearchParams(window.location.search);
@@ -129,7 +129,7 @@ export function MailToolbar({
 
         {/* Pagination */}
         <span className="text-sm text-gray-500">
-          {totalCount > 0 ? `${start}–${end}` : "0"} {totalStr}
+          {totalCount > 0 ? `${start}–${end}` : "No messages"}
         </span>
         <div className="flex items-center gap-1">
           <button

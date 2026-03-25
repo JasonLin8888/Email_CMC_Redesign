@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, Archive, Mail, MailOpen } from "lucide-react";
+import { Trash2, Archive, Mail, MailOpen, CalendarPlus } from "lucide-react";
 import { MessageSummary } from "@/lib/email/types";
 import { formatDate } from "@/lib/utils";
 
@@ -10,20 +10,24 @@ interface Props {
   message: MessageSummary;
   folder: string;
   selected: boolean;
+  onDragStart: (id: string) => void;
   onSelect: (id: string, selected: boolean) => void;
   onDelete: (id: string) => void;
   onArchive: (id: string) => void;
   onMarkRead: (id: string, isRead: boolean) => void;
+  onAddToCalendar: (id: string) => void;
 }
 
 export function MailRow({
   message,
   folder,
   selected,
+  onDragStart,
   onSelect,
   onDelete,
   onArchive,
   onMarkRead,
+  onAddToCalendar,
 }: Props) {
   const [hovered, setHovered] = useState(false);
   const router = useRouter();
@@ -38,6 +42,12 @@ export function MailRow({
 
   return (
     <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", message.id);
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart(message.id);
+      }}
       onClick={handleRowClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -80,9 +90,17 @@ export function MailRow({
       </div>
 
       {/* Right side: time or actions */}
-      <div className="ml-2 shrink-0 w-24 flex justify-end">
+      <div className="ml-2 shrink-0 w-52 flex justify-end">
         {hovered ? (
           <div className="flex items-center gap-1" data-no-nav>
+            <button
+              onClick={() => onAddToCalendar(message.id)}
+              className="h-7 px-2 rounded-md border border-gray-200 text-xs text-gray-600 hover:bg-green-50 hover:text-green-700 hover:border-green-200 transition-colors flex items-center gap-1"
+              title="Add to Calendar"
+            >
+              <CalendarPlus size={13} />
+              Add to Calendar
+            </button>
             <button
               onClick={() => onDelete(message.id)}
               className="p-1 hover:bg-red-100 rounded text-gray-500 hover:text-red-600"

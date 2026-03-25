@@ -76,6 +76,7 @@ export interface ListMessagesParams {
 
 export interface SendMessageParams {
   to: EmailAddress[];
+  from: EmailAddress;
   subject: string;
   body: string;
   cc?: EmailAddress[];
